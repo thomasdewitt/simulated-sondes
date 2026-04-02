@@ -129,7 +129,14 @@ def simulate_sondes(les, sonde_type, n_sondes, rng):
             if len(write_idx) > 0:
                 iy_w, ix_w, iz_w = iy[can_write], ix[can_write], iz[can_write]
                 for var in SAMPLE_VARIABLES:
-                    vals = les.sample(var, iy_w, ix_w, iz_w)
+                    if var == "P":
+                        # Total pressure = base state (mb→Pa) + perturbation (Pa)
+                        # Use same iz level for both to stay consistent
+                        pp = les.sample("PP", iy_w, ix_w, iz_w)
+                        pbase = les.pres[iz_w] * 100.0
+                        vals = pbase + pp
+                    else:
+                        vals = les.sample(var, iy_w, ix_w, iz_w)
                     data_meas[var][write_idx, write_mc] = vals
                 z_meas[write_idx, write_mc] = z[write_idx]
                 meas_count[write_idx] = write_mc + 1
@@ -173,6 +180,9 @@ def simulate_instantaneous(les, n_columns, rng):
     z_les = les.z
     z_mask = z_les <= 10000.0  # only below 10 km
 
+    # Base-state pressure on the masked LES z-grid (Pa)
+    pres_base_col = les.pres[z_mask] * 100.0
+
     # Distribute columns across all available timesteps
     n_steps = len(les.timesteps)
     per_step = n_columns // n_steps
@@ -187,6 +197,9 @@ def simulate_instantaneous(les, n_columns, rng):
     col_x = np.zeros(n_columns, dtype=np.float64)
     col_y = np.zeros(n_columns, dtype=np.float64)
 
+    # LES variables to load (PP instead of P)
+    les_vars = [v if v != "P" else "PP" for v in SAMPLE_VARIABLES]
+
     col_offset = 0
     for si, step in enumerate(les.timesteps):
         nc_this = counts_per_step[si]
@@ -195,8 +208,7 @@ def simulate_instantaneous(les, n_columns, rng):
 
         print(f"  Timestep {step}: extracting {nc_this} columns")
 
-        # Load only sample variables (no W needed)
-        data = les.load_timestep(step, SAMPLE_VARIABLES)
+        data = les.load_timestep(step, les_vars)
 
         # Random horizontal locations
         ix = rng.integers(0, les.nx, size=nc_this)
@@ -208,9 +220,10 @@ def simulate_instantaneous(les, n_columns, rng):
             col_x[idx] = les.x[ix[j]]
             col_y[idx] = les.y[iy[j]]
 
-            for var in SAMPLE_VARIABLES:
-                profile = data[var][iy[j], ix[j], z_mask].astype(np.float64)
-                # Interpolate to 10m grid
+            for var, les_var in zip(SAMPLE_VARIABLES, les_vars):
+                profile = data[les_var][iy[j], ix[j], z_mask].astype(np.float64)
+                if var == "P":
+                    profile = pres_base_col + profile  # base state + PP
                 f_interp = interp1d(
                     z_les[z_mask], profile,
                     kind="linear", bounds_error=False, fill_value=np.nan,
@@ -224,7 +237,7 @@ def simulate_instantaneous(les, n_columns, rng):
     return centers, regridded, col_times, col_x, col_y
 
 
-def save_netcdf(filepath, centers, regridded, pres_base,
+def save_netcdf(filepath, centers, regridded,
                 launch_times, launch_x, launch_y, sonde_type):
     """Save regridded profiles to NetCDF."""
     n_sondes = regridded["U"].shape[0]
@@ -252,37 +265,21 @@ def save_netcdf(filepath, centers, regridded, pres_base,
         ly[:] = launch_y
         ly.units = "m"
 
-        # Compute total pressure: pres_base(z) in mb -> Pa, plus PP perturbation
-        # pres_base is on LES z-grid; interpolate to regridded altitude grid
-        from scipy.interpolate import interp1d as _interp1d
-        f_pres = _interp1d(pres_base[:, 0], pres_base[:, 1],
-                           kind="linear", bounds_error=False, fill_value=np.nan)
-        pres_base_regrid = f_pres(centers) * 100.0  # mb -> Pa
-
         # Data variables
         var_meta = {
             "U": ("m/s", "zonal wind"),
             "V": ("m/s", "meridional wind"),
-            "TABS": ("K", "absolute temperature"),
             "QV": ("g/kg", "water vapor mixing ratio"),
-            "PP": ("Pa", "pressure perturbation"),
+            "P": ("Pa", "total pressure"),
         }
 
         for var in regridded:
-            if var == "PP":
-                # Save total pressure instead
-                v = ds.createVariable("P", "f4", ("sonde", "altitude"),
-                                      zlib=True, complevel=4)
-                v[:] = regridded["PP"] + pres_base_regrid[np.newaxis, :]
-                v.units = "Pa"
-                v.long_name = "total pressure"
-            else:
-                units, long_name = var_meta.get(var, ("", var))
-                v = ds.createVariable(var, "f4", ("sonde", "altitude"),
-                                      zlib=True, complevel=4)
-                v[:] = regridded[var]
-                v.units = units
-                v.long_name = long_name
+            units, long_name = var_meta.get(var, ("", var))
+            v = ds.createVariable(var, "f4", ("sonde", "altitude"),
+                                  zlib=True, complevel=4)
+            v[:] = regridded[var]
+            v.units = units
+            v.long_name = long_name
 
         ds.description = f"Simulated {sonde_type} profiles in TWPICE LES"
 
@@ -308,9 +305,6 @@ def main():
 
     les = LESDataManager(subset_xy=args.subset_xy)
 
-    # Pressure base state: (z, pres_mb)
-    pres_base = np.column_stack([les.z, les.pres])
-
     # --- Simulated dropsondes ---
     z_meas, data_meas, meas_count, lt, lx, ly = simulate_sondes(
         les, "dropsonde", n_drop, rng
@@ -320,7 +314,7 @@ def main():
     )
     save_netcdf(
         os.path.join(OUTPUT_DIR, "simulated_dropsondes.nc"),
-        centers, regridded, pres_base, lt, lx, ly, "dropsonde"
+        centers, regridded, lt, lx, ly, "dropsonde"
     )
 
     # --- Simulated radiosondes ---
@@ -332,7 +326,7 @@ def main():
     )
     save_netcdf(
         os.path.join(OUTPUT_DIR, "simulated_radiosondes.nc"),
-        centers, regridded, pres_base, lt, lx, ly, "radiosonde"
+        centers, regridded, lt, lx, ly, "radiosonde"
     )
 
     # --- Instantaneous columns ---
@@ -341,7 +335,7 @@ def main():
     )
     save_netcdf(
         os.path.join(OUTPUT_DIR, "instantaneous_columns.nc"),
-        centers, regridded, pres_base, col_times, col_x, col_y, "instantaneous column"
+        centers, regridded, col_times, col_x, col_y, "instantaneous column"
     )
 
     print("\nAll done.")

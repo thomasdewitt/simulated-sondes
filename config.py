@@ -2,14 +2,14 @@
 
 DATA_DIR = "/media/thomasdewitt/Expansion/LES-data/SAM-TWPICE"
 
-# Variables to sample along sonde trajectory (what a real sonde measures)
-SAMPLE_VARIABLES = ["U", "V", "TABS", "QV", "PP"]
+# Variables saved per sonde (P = PP + base state, computed at sample time)
+SAMPLE_VARIABLES = ["U", "V", "QV", "P"]
 
 # Variables needed for trajectory advection
 ADVECT_VARIABLES = ["U", "V", "W"]
 
 # All variables that must be loaded from LES
-LOAD_VARIABLES = list(set(SAMPLE_VARIABLES + ADVECT_VARIABLES))
+LOAD_VARIABLES = list(set(["U", "V", "W", "QV", "PP"]))
 
 N_DROPSONDES = 1000
 N_RADIOSONDES = 1000

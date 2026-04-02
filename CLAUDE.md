@@ -20,4 +20,4 @@ LES data on `/media/thomasdewitt/Expansion/LES-data/SAM-TWPICE/OUT_3D.{U,V,W,TAB
 
 ## Output
 
-Three NetCDF files in `output/`: `simulated_dropsondes.nc`, `simulated_radiosondes.nc`, `instantaneous_columns.nc`. Each has dims `(sonde, altitude)` with variables U, V, TABS, QV, P on a 10m vertical grid.
+Three NetCDF files in `output/`: `simulated_dropsondes.nc`, `simulated_radiosondes.nc`, `instantaneous_columns.nc`. Each has dims `(sonde, altitude)` with variables U, V, QV, P on a 10m vertical grid.
