@@ -1,6 +1,6 @@
 """Configuration for simulated sonde measurements in TWPICE LES."""
 
-DATA_DIR = "/Volumes/BLUE/TWPICE"
+DATA_DIR = "/media/thomasdewitt/Expansion/LES-data/SAM-TWPICE"
 
 # Variables to sample along sonde trajectory (what a real sonde measures)
 SAMPLE_VARIABLES = ["U", "V", "TABS", "QV", "PP"]

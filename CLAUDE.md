@@ -16,7 +16,7 @@ python simulate.py --subset-xy 128 --n-sondes 10
 
 ## Data
 
-LES data on `/Volumes/BLUE/TWPICE/OUT_3D.{U,V,W,TABS,QV,PP}/`. Currently 3 timesteps; will work with all 23 once downloaded.
+LES data on `/media/thomasdewitt/Expansion/LES-data/SAM-TWPICE/OUT_3D.{U,V,W,TABS,QV,PP}/`. 23 timesteps available.
 
 ## Output
 
