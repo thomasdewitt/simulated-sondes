@@ -294,6 +294,8 @@ def main():
     parser.add_argument("--n-sondes", type=int, default=None,
                         help="Override number of sondes per type (for testing)")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--only", choices=["drop", "radio", "inst"],
+                        help="Run only one sonde type")
     args = parser.parse_args()
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -305,38 +307,45 @@ def main():
 
     les = LESDataManager(subset_xy=args.subset_xy)
 
-    # --- Simulated dropsondes ---
-    z_meas, data_meas, meas_count, lt, lx, ly = simulate_sondes(
-        les, "dropsonde", n_drop, rng
-    )
-    centers, regridded = regrid_profiles(
-        z_meas, data_meas, n_drop, z_meas.shape[1], meas_count
-    )
-    save_netcdf(
-        os.path.join(OUTPUT_DIR, "simulated_dropsondes.nc"),
-        centers, regridded, lt, lx, ly, "dropsonde"
-    )
+    run = args.only  # None means run all
 
-    # --- Simulated radiosondes ---
-    z_meas, data_meas, meas_count, lt, lx, ly = simulate_sondes(
-        les, "radiosonde", n_radio, rng
-    )
-    centers, regridded = regrid_profiles(
-        z_meas, data_meas, n_radio, z_meas.shape[1], meas_count
-    )
-    save_netcdf(
-        os.path.join(OUTPUT_DIR, "simulated_radiosondes.nc"),
-        centers, regridded, lt, lx, ly, "radiosonde"
-    )
+    if run in (None, "drop"):
+        z_meas, data_meas, meas_count, lt, lx, ly = simulate_sondes(
+            les, "dropsonde", n_drop, rng
+        )
+        centers, regridded = regrid_profiles(
+            z_meas, data_meas, n_drop, z_meas.shape[1], meas_count
+        )
+        save_netcdf(
+            os.path.join(OUTPUT_DIR, "simulated_dropsondes.nc"),
+            centers, regridded, lt, lx, ly, "dropsonde"
+        )
+        del z_meas, data_meas, regridded
 
-    # --- Instantaneous columns ---
-    centers, regridded, col_times, col_x, col_y = simulate_instantaneous(
-        les, n_inst, rng
-    )
-    save_netcdf(
-        os.path.join(OUTPUT_DIR, "instantaneous_columns.nc"),
-        centers, regridded, col_times, col_x, col_y, "instantaneous column"
-    )
+    if run in (None, "radio"):
+        z_meas, data_meas, meas_count, lt, lx, ly = simulate_sondes(
+            les, "radiosonde", n_radio, rng
+        )
+        centers, regridded = regrid_profiles(
+            z_meas, data_meas, n_radio, z_meas.shape[1], meas_count
+        )
+        save_netcdf(
+            os.path.join(OUTPUT_DIR, "simulated_radiosondes.nc"),
+            centers, regridded, lt, lx, ly, "radiosonde"
+        )
+        del z_meas, data_meas, regridded
+
+    # Clear cached LES data before instantaneous (which loads its own)
+    les._data.clear()
+
+    if run in (None, "inst"):
+        centers, regridded, col_times, col_x, col_y = simulate_instantaneous(
+            les, n_inst, rng
+        )
+        save_netcdf(
+            os.path.join(OUTPUT_DIR, "instantaneous_columns.nc"),
+            centers, regridded, col_times, col_x, col_y, "instantaneous column"
+        )
 
     print("\nAll done.")
 
