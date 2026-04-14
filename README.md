@@ -10,18 +10,32 @@ Sondes are initialized at random times and horizontal locations within the first
 
 As a control, 1000 instantaneous vertical columns are also extracted at random horizontal locations, distributed evenly across all available timesteps. These columns are interpolated onto the same 10 m grid and serve as a reference unaffected by sonde drift or temporal inconsistency.
 
+As a synthetic control with known scaling properties, 1000 multifractal profiles are also generated for each of four fractional-integral regimes: uniform `H=0.6`, uniform `H=0.6` without the inertia-smoothing step (for reference), a broken regime with `H=0.3` below 10 m and `H=1` above, and a broken regime with `H=0.3` below 1 km and `H=1` above. Each profile starts as an FIF flux (`alpha=1.8`, `C1=0.05`, `H=0`) of length 4,000,000 that is coarsened by averaging into 40,000 samples at 1 m spacing, fractionally integrated, smoothed with a cubic B-spline low-pass filter (Ooyama / NCAR ASPEN style, 50 m cutoff wavelength) to mimic sonde inertia and processing, truncated to the bottom 20 km (to break periodicity), normalised to unit mean, and multiplied by 10.
+
 ## Usage
 
-Full run (requires machine with enough RAM for 2048x2048x255 arrays):
+Set up the environment with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-python simulate.py
+uv sync
+```
+
+Full LES-sonde run (requires machine with enough RAM for 2048x2048x255 arrays):
+
+```bash
+uv run python simulate.py
 ```
 
 Test run on limited-memory machine:
 
 ```bash
-python simulate.py --subset-xy 128 --n-sondes 10
+uv run python simulate.py --subset-xy 128 --n-sondes 10
+```
+
+Multifractal synthetic sondes (GPU-accelerated via `scaleinvariance` torch/cuda backend):
+
+```bash
+uv run python simulate_multifractal.py
 ```
 
 ## Data
@@ -30,4 +44,4 @@ LES data must be locally available.
 
 ## Output
 
-Three NetCDF files in `output/`: `simulated_dropsondes.nc`, `simulated_radiosondes.nc`, `instantaneous_columns.nc`. Each has dims `(sonde, altitude)` with variables U, V, QV, P on a 10 m vertical grid.
+Seven NetCDF files in `output/`: `simulated_dropsondes.nc`, `simulated_radiosondes.nc`, `instantaneous_columns.nc` (each dims `(sonde, altitude)` with U, V, QV, P on a 10 m vertical grid), plus `simulated_multifractal_uniform_H06.nc`, `simulated_multifractal_uniform_H06_nosmooth.nc`, `simulated_multifractal_broken_10m.nc`, `simulated_multifractal_broken_1km.nc` (each dims `(sonde, altitude)` with variable `u` on a 1 m vertical grid from 0–20 km).

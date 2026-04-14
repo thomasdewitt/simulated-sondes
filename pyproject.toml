@@ -1,0 +1,17 @@
+[project]
+name = "simulated-sondes"
+version = "0.1.0"
+description = "Simulated sonde measurements in TWPICE LES, plus synthetic multifractal profiles."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "netCDF4",
+    "xarray",
+    "torch",
+    "scaleinvariance",
+    "matplotlib>=3.10.8",
+]
+
+[tool.uv.sources]
+scaleinvariance = { path = "../scaleinvariance", editable = true }
