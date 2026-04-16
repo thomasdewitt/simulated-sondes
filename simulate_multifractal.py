@@ -39,7 +39,7 @@ SCALE = 10.0
 
 # FIF parameters
 ALPHA = 1.8
-C1 = 0.05
+C1 = 0.02
 H_FIF = 0.0
 
 # Three fractional-integral regimes
